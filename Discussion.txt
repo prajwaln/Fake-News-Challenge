@@ -8,3 +8,6 @@ Baseline: Naive Bayes [Word Frequencies] / Supervised learning
 
 Word Classification using Unsupervised Learning
 
+To Do:
+1. Test out the baseline
+2. Figure out what has been implemented and what needs to be.
