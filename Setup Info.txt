@@ -1,0 +1,81 @@
+Microsoft Windows [Version 6.2.9200]
+(c) 2012 Microsoft Corporation. All rights reserved.
+
+C:\Users\PRAJWAL>pip install numpy
+Collecting numpy
+  Downloading https://files.pythonhosted.org/packages/af/e4/7d7107bdfb5c33f6cf33
+cdafea8c27d1209cf0068a6e3e3d3342be6f3578/numpy-1.14.3-cp36-none-win_amd64.whl (1
+3.4MB)
+    100% |████████████████████████████████| 13.4MB 2.2MB/s
+Installing collected packages: numpy
+Successfully installed numpy-1.14.3
+
+C:\Users\PRAJWAL>pip install sklearn
+Collecting sklearn
+  Downloading https://files.pythonhosted.org/packages/1e/7a/dbb3be0ce9bd5c8b7e3d
+87328e79063f8b263b2b1bfa4774cb1147bfcd3f/sklearn-0.0.tar.gz
+Collecting scikit-learn (from sklearn)
+  Downloading https://files.pythonhosted.org/packages/67/e5/1459a3d6c6029a86b840
+b7701c48429d857eb2086916fec76f97c94dcc7a/scikit_learn-0.19.1-cp36-cp36m-win_amd6
+4.whl (4.3MB)
+    100% |████████████████████████████████| 4.4MB 2.7MB/s
+Building wheels for collected packages: sklearn
+  Running setup.py bdist_wheel for sklearn ... done
+  Stored in directory: C:\Users\PRAJWAL\AppData\Local\pip\Cache\wheels\76\03\bb\
+589d421d27431bcd2c6da284d5f2286c8e3b2ea3cf1594c074
+Successfully built sklearn
+Installing collected packages: scikit-learn, sklearn
+Successfully installed scikit-learn-0.19.1 sklearn-0.0
+
+C:\Users\PRAJWAL>pip install scipy
+Collecting scipy
+  Downloading https://files.pythonhosted.org/packages/62/e2/364f0bcc641aeff79d74
+3c732769d5dc31a1e78c27699229431412c4b425/scipy-1.1.0-cp36-none-win_amd64.whl (31
+.1MB)
+    100% |████████████████████████████████| 31.1MB 233kB/s
+Requirement already satisfied: numpy>=1.8.2 in c:\users\prajwal\appdata\local\pr
+ograms\python\python36\lib\site-packages (from scipy) (1.14.3)
+Installing collected packages: scipy
+Successfully installed scipy-1.1.0
+
+C:\Users\PRAJWAL>pip install nltk
+Collecting nltk
+  Downloading https://files.pythonhosted.org/packages/50/09/3b1755d528ad9156ee72
+43d52aa5cd2b809ef053a0f31b53d92853dd653a/nltk-3.3.0.zip (1.4MB)
+    100% |████████████████████████████████| 1.4MB 2.6MB/s
+Collecting six (from nltk)
+  Downloading https://files.pythonhosted.org/packages/67/4b/141a581104b1f6397bfa
+78ac9d43d8ad29a7ca43ea90a2d863fe3056e86a/six-1.11.0-py2.py3-none-any.whl
+Building wheels for collected packages: nltk
+  Running setup.py bdist_wheel for nltk ... done
+  Stored in directory: C:\Users\PRAJWAL\AppData\Local\pip\Cache\wheels\d1\ab\40\
+3bceea46922767e42986aef7606a600538ca80de6062dc266c
+Successfully built nltk
+Installing collected packages: six, nltk
+Successfully installed nltk-3.3 six-1.11.0
+
+C:\Users\PRAJWAL>pip install tqdm
+Collecting tqdm
+  Downloading https://files.pythonhosted.org/packages/d8/ca/6524dfba7a0e850d3fda
+223693779035ddc8bf5c242acd9ee4eb9e52711a/tqdm-4.23.3-py2.py3-none-any.whl (42kB)
+
+    100% |████████████████████████████████| 51kB 1.3MB/s
+Installing collected packages: tqdm
+Successfully installed tqdm-4.23.3
+
+C:\Users\PRAJWAL>
+
+==========================================================================
+
+>>> import nltk
+>>> nltk.download('punkt')
+[nltk_data] Downloading package punkt to
+[nltk_data]     C:\Users\PRAJWAL\AppData\Roaming\nltk_data...
+[nltk_data]   Unzipping tokenizers\punkt.zip.
+
+>>> import nltk
+>>> nltk.download('wordnet')
+[nltk_data] Downloading package wordnet to
+[nltk_data]     C:\Users\PRAJWAL\AppData\Roaming\nltk_data...
+[nltk_data]   Unzipping corpora\wordnet.zip.
+
