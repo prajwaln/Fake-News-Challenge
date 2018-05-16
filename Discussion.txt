@@ -1,0 +1,10 @@
+Step 1:
+
+- Unrelated vs Related (Discusses vs Partiality (Agree vs Disagree)) [Tree Learning/Unsupervised]
+
+Approach for Processing Text:
+
+Baseline: Naive Bayes [Word Frequencies] / Supervised learning
+
+Word Classification using Unsupervised Learning
+
