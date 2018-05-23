@@ -12,10 +12,12 @@ class DataSet():
         self.stances = self.read(stances)
         articles = self.read(bodies)
         self.articles = dict()
+        self.labels = dict()
 
         #make the body ID an integer value
         for s in self.stances:
             s['Body ID'] = int(s['Body ID'])
+            s['Predict'] = '?'
 
         #copy all bodies into a dictionary
         for article in articles:
