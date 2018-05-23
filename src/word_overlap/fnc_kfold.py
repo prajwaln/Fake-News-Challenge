@@ -6,7 +6,7 @@ from feature_engineering import refuting_features, polarity_features, hand_featu
 from feature_engineering import word_overlap_features
 from utils.dataset import DataSet
 from utils.generate_test_splits import kfold_split, get_stances_for_folds
-from utils.score import report_score, LABELS, score_submission
+from utils.score import report_score, LABELS_RELATED, score_submission
 
 from utils.system import parse_params, check_version
 
@@ -15,16 +15,17 @@ def generate_features(stances,dataset,name):
     h, b, y = [],[],[]
 
     for stance in stances:
-        y.append(LABELS.index(stance['Stance']))
+        stance_related = 'unrelated' if stance['Stance'] == 'unrelated' else 'discuss'
+        y.append(LABELS_RELATED.index(stance_related))
         h.append(stance['Headline'])
         b.append(dataset.articles[stance['Body ID']])
 
     X_overlap = gen_or_load_feats(word_overlap_features, h, b, "features/overlap."+name+".npy")
-    X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
-    X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
+    #X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
+    #X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
 
-    X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+    X = np.c_[X_overlap, X_hand]#, X_polarity, X_refuting]
     return X,y
 
 if __name__ == "__main__":
@@ -69,8 +70,8 @@ if __name__ == "__main__":
         clf = GradientBoostingClassifier(n_estimators=200, random_state=14128, verbose=True)
         clf.fit(X_train, y_train)
 
-        predicted = [LABELS[int(a)] for a in clf.predict(X_test)]
-        actual = [LABELS[int(a)] for a in y_test]
+        predicted = [LABELS_RELATED[int(a)] for a in clf.predict(X_test)]
+        actual = [LABELS_RELATED[int(a)] for a in y_test]
 
         fold_score, _ = score_submission(actual, predicted)
         max_fold_score, _ = score_submission(actual, actual)
@@ -85,8 +86,8 @@ if __name__ == "__main__":
 
 
     #Run on Holdout set and report the final score on the holdout set
-    predicted = [LABELS[int(a)] for a in best_fold.predict(X_holdout)]
-    actual = [LABELS[int(a)] for a in y_holdout]
+    predicted = [LABELS_RELATED[int(a)] for a in best_fold.predict(X_holdout)]
+    actual = [LABELS_RELATED[int(a)] for a in y_holdout]
 
     print("Scores on the dev set")
     report_score(actual,predicted)
@@ -94,8 +95,8 @@ if __name__ == "__main__":
     print("")
 
     #Run on competition dataset
-    predicted = [LABELS[int(a)] for a in best_fold.predict(X_competition)]
-    actual = [LABELS[int(a)] for a in y_competition]
+    predicted = [LABELS_RELATED[int(a)] for a in best_fold.predict(X_competition)]
+    actual = [LABELS_RELATED[int(a)] for a in y_competition]
 
     print("Scores on the test set")
     report_score(actual,predicted)

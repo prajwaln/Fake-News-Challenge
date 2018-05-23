@@ -4,6 +4,7 @@ import nltk
 import numpy as np
 from sklearn import feature_extraction
 from tqdm import tqdm
+import operator, math
 
 
 _wnl = nltk.WordNetLemmatizer()
@@ -30,21 +31,47 @@ def remove_stopwords(l):
 
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
     if not os.path.isfile(feature_file):
+        print("Creating {}...".format(feature_file))
         feats = feat_fn(headlines, bodies)
         np.save(feature_file, feats)
 
     return np.load(feature_file)
 
 
+def get_commonwords(l):
+    # Identifies common, homogeneous words across multiple articles
+    # Added by Julian
+    counts = {}
+    for headline, body in l:
+        article = headline + body
+        article_words = {}
+        for word in article:
+            if word not in article_words: article_words[word] = 0
+            article_words[word] += 1
+        for word, count in article_words.items():
+            if word not in counts: counts[word] = []
+            counts[word].append(count/len(article))
+    for word, c_list in counts.items():
+        mean = sum(c_list)/len(l)
+        sd = math.sqrt(sum([(x-mean)**2 for x in c_list])/len(l))
+        counts[word] = sd/mean
+    sorted_counts = sorted(counts.items(), key=operator.itemgetter(1))
+    return [k for k,v in sorted_counts[:int(0.005 * len(sorted_counts))]]
 
 
 def word_overlap_features(headlines, bodies):
     X = []
+    articles = []
     for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
         clean_body = clean(body)
         clean_headline = get_tokenized_lemmas(clean_headline)
         clean_body = get_tokenized_lemmas(clean_body)
+        articles.append((clean_headline, clean_body))
+    common_words = get_commonwords(articles)
+    for clean_headline, clean_body in articles:
+        clean_headline = [x for x in clean_headline if x not in common_words]
+        clean_body = [x for x in clean_body if x not in common_words]
         features = [
             len(set(clean_headline).intersection(clean_body)) / float(len(set(clean_headline).union(clean_body)))]
         X.append(features)
@@ -162,10 +189,10 @@ def hand_features(headlines, bodies):
         # appears in the body text.
         bin_count = 0
         bin_count_early = 0
-        for headline_token in clean(headline).split(" "):
-            if headline_token in clean(body):
+        for headline_token in headline.split(" "):
+            if headline_token in body:
                 bin_count += 1
-            if headline_token in clean(body)[:255]:
+            if headline_token in body[:255]:
                 bin_count_early += 1
         return [bin_count, bin_count_early]
 
@@ -175,8 +202,8 @@ def hand_features(headlines, bodies):
         # are ignored.
         bin_count = 0
         bin_count_early = 0
-        for headline_token in remove_stopwords(clean(headline).split(" ")):
-            if headline_token in clean(body):
+        for headline_token in remove_stopwords(headline.split(" ")):
+            if headline_token in body:
                 bin_count += 1
                 bin_count_early += 1
         return [bin_count, bin_count_early]
@@ -185,8 +212,6 @@ def hand_features(headlines, bodies):
         # Count how many times an n-gram of the title
         # appears in the entire body, and intro paragraph
 
-        clean_body = clean(body)
-        clean_headline = clean(headline)
         features = []
         features = append_chargrams(features, clean_headline, clean_body, 2)
         features = append_chargrams(features, clean_headline, clean_body, 8)
@@ -200,10 +225,22 @@ def hand_features(headlines, bodies):
         return features
 
     X = []
+    articles = []
+    lemmas = []
     for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
-        X.append(binary_co_occurence(headline, body)
-                 + binary_co_occurence_stops(headline, body)
-                 + count_grams(headline, body))
+        clean_headline = clean(headline)
+        clean_body = clean(body)
+        articles.append((clean_headline, clean_body))
+        clean_headline_l = get_tokenized_lemmas(clean_headline)
+        clean_body_l = get_tokenized_lemmas(clean_body)
+        lemmas.append((clean_headline_l, clean_body_l))
+    common_words = r'(\b{}\b)'.format('\\b|\\b'.join(get_commonwords(lemmas)))
+    for clean_headline, clean_body in articles:
+        clean_headline = re.sub(common_words, '', clean_headline)
+        clean_body = re.sub(common_words, '', clean_body)
+        X.append(binary_co_occurence(clean_headline, clean_body)
+                 + binary_co_occurence_stops(clean_headline, clean_body)
+                 + count_grams(clean_headline, clean_body))
 
 
     return X
