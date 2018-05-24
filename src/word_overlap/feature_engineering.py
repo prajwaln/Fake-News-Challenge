@@ -30,12 +30,18 @@ def remove_stopwords(l):
 
 
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
-    if not os.path.isfile(feature_file):
+    create = False
+    if not os.path.isfile(feature_file): create = True
+    else:
+        X = np.load(feature_file)
+        if X.shape[0] != len(headlines): create = True
+    if create:
         print("Creating {}...".format(feature_file))
         feats = feat_fn(headlines, bodies)
         np.save(feature_file, feats)
+        X = np.load(feature_file)
 
-    return np.load(feature_file)
+    return X
 
 
 def get_commonwords(l):

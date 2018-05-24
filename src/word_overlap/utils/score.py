@@ -2,7 +2,6 @@
 #Original credit - @bgalbraith
 
 LABELS = ['agree', 'disagree', 'discuss', 'unrelated']
-LABELS_RELATED = ['unrelated','discuss'] # let 'discuss' be a placeholder for 'related'
 RELATED = LABELS[0:3]
 
 def score_submission(gold_labels, test_labels):

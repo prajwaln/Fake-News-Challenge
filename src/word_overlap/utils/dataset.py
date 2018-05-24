@@ -12,10 +12,12 @@ class DataSet():
         self.stances = self.read(stances)
         articles = self.read(bodies)
         self.articles = dict()
-        self.labels = dict()
 
         #make the body ID an integer value
+        ct = 0
         for s in self.stances:
+            s['Stance ID'] = ct
+            ct += 1
             s['Body ID'] = int(s['Body ID'])
             s['Predict'] = '?'
 
@@ -26,7 +28,11 @@ class DataSet():
         print("Total stances: " + str(len(self.stances)))
         print("Total bodies: " + str(len(self.articles)))
 
+    def get_labelled_stances(self):
+        return [s for s in self.stances if s['Predict'] != '?']
 
+    def get_unlabelled_stances(self):
+        return [s for s in self.stances if s['Predict'] == '?']
 
     def read(self,filename):
         rows = []

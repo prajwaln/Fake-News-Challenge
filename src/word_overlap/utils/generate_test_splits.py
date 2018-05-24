@@ -49,7 +49,7 @@ def kfold_split(dataset, training = 0.8, n_folds = 10, base_dir=os.path.dirname(
 def get_stances_for_folds(dataset,folds,hold_out):
     stances_folds = defaultdict(list)
     stances_hold_out = []
-    for stance in dataset.stances:
+    for stance in dataset.get_unlabelled_stances():
         if stance['Body ID'] in hold_out:
             stances_hold_out.append(stance)
         else:
