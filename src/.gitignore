@@ -6,3 +6,4 @@ features/*.npy
 .idea
 __pycache__
 *.npy
+~$*
