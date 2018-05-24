@@ -10,62 +10,68 @@ from utils.score import report_score, LABELS, score_submission
 
 from utils.system import parse_params, check_version
 
+runpass = 0
 
-def init_features(stances,dataset):
-    h, b, y = [],[],[]
+def init_features(stances,dataset,repl={}):
+    id, h, b, y = [],[],[],[]
 
     for stance in stances:
-        if stance['Predict'] != '?': continue
-        y.append(LABELS.index(stance['Stance']))
+        id.append(stance['Stance ID'])
+        s = stance['Stance']
+        y.append(LABELS.index(repl[s] if s in repl else s))
         h.append(stance['Headline'])
         b.append(dataset.articles[stance['Body ID']])
 
-    return h, b, y
+    return id, h, b, y
 
 def generate_features_all(stances,dataset,name):
     # Pass all articles through here first
-    for stance in stances:
-        stance['Stance'] = 'unrelated' if stance['Stance'] == 'unrelated' else 'discuss'
-    h, b, y = init_features(stances,dataset)
+    id, h, b, y = init_features(stances,dataset,{'agree':'discuss','disagree':'discuss'})
 
     X_overlap = gen_or_load_feats(word_overlap_features, h, b, "features/overlap."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
 
     X = np.c_[X_overlap, X_hand]
-    return X,y
+    return X,y,id
 
 def generate_features_related(stances,dataset,name):
     # Pass related articles through here second
-    for stance in stances:
-        stance['Stance'] = 'discuss' if stance['Stance'] == 'discuss' else 'disagree'
-    h, b, y = init_features(stances,dataset)
+    id, h, b, y = init_features(stances,dataset,{'agree':'disagree'})
 
     X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
     X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
 
-    X = np.c_[X_polarity, X_refuting]
-    return X,y
+    X = np.c_[X_polarity, X_refuting, X_hand]
+    return X,y,id
 
-def generate_features_partial(stances,dataset,name):
-    # Pass partial articles through here third
-    h, b, y = init_features(stances,dataset)
+def generate_features_biased(stances,dataset,name):
+    # Pass biased articles through here third
+    id, h, b, y = init_features(stances,dataset)
 
     X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
     X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
 
-    X = np.c_[X_polarity, X_refuting]
-    return X,y
+    X = np.c_[X_polarity, X_refuting, X_hand]
+    return X,y,id
 
-def run_stage(fn, folds, fold_stances, hold_out_stances, assignclasses):
+def run_stage(fn, d, competition_dataset):
+    global runpass
+    runpass += 1
+    
+    folds,hold_out = kfold_split(d,n_folds=10)
+    fold_stances, hold_out_stances = get_stances_for_folds(d,folds,hold_out)
+    
     # Load/Precompute all features now
     Xs = dict()
     ys = dict()
-    X_comp,y_comp = fn(competition_dataset.stances,competition_dataset,"competition")
-    X_holdout,y_holdout = fn(hold_out_stances,d,"holdout")
+    ids = dict()
+    comp_stances = competition_dataset.get_unlabelled_stances()
+    X_comp,y_comp,id_comp = fn(comp_stances,competition_dataset,"competition_{}".format(str(runpass)))
+    X_holdout,y_holdout,id_holdout = fn(hold_out_stances,d,"holdout_{}".format(str(runpass)))
     for fold in fold_stances:
-        Xs[fold],ys[fold] = fn(fold_stances[fold],d,str(fold))
+        Xs[fold],ys[fold],ids[fold] = fn(fold_stances[fold],d,"{}_{}".format(str(fold),str(runpass)))
 
 
     best_score = 0
@@ -74,23 +80,23 @@ def run_stage(fn, folds, fold_stances, hold_out_stances, assignclasses):
 
     # Classifier for each fold
     for fold in fold_stances:
-        ids = list(range(len(folds)))
-        del ids[fold]
-
-        X_train = np.vstack(tuple([Xs[i] for i in ids]))
-        y_train = np.hstack(tuple([ys[i] for i in ids]))
-
+        id_train = np.hstack(tuple([ids[i] for i in range(len(fold_stances)) if i != fold]))
+        X_train = np.vstack(tuple([Xs[i] for i in range(len(fold_stances)) if i != fold]))
+        y_train = np.hstack(tuple([ys[i] for i in range(len(fold_stances)) if i != fold]))
+        id_test = ids[fold]
         X_test = Xs[fold]
         y_test = ys[fold]
 
         clf = GradientBoostingClassifier(n_estimators=200, random_state=14128, verbose=True)
         clf.fit(X_train, y_train)
 
-        predicted = [LABELS[int(a)] for a in clf.predict(X_test)]
-        actual = [LABELS[int(a)] for a in y_test]
+        predicted_test = [LABELS[int(a)] for a in clf.predict(X_test)]
+        actual_test = [LABELS[int(a)] for a in y_test]
+        for i in range(len(actual_test)):
+            d.stances[id_test[i]]['Predict'] = actual_test[i] # Data is known
 
-        fold_score, _ = score_submission(actual, predicted)
-        max_fold_score, _ = score_submission(actual, actual)
+        fold_score, _ = score_submission(actual_test, predicted_test)
+        max_fold_score, _ = score_submission(actual_test, actual_test)
 
         score = fold_score/max_fold_score
 
@@ -100,37 +106,24 @@ def run_stage(fn, folds, fold_stances, hold_out_stances, assignclasses):
             best_fold = clf
 
     #Run on Holdout set and report the final score on the holdout set
-    predicted_test = [LABELS[int(a)] for a in best_fold.predict(X_holdout)]
-    actual_test = [LABELS[int(a)] for a in y_holdout]
-    assign_test_ids = [i for i in range(len(y_holdout)) if predicted_test[i] in assignclasses]
-    for i in assign_test_ids: d.stances[i]['Predict'] = predicted_test[i]
+    predicted_hold = [LABELS[int(a)] for a in best_fold.predict(X_holdout)]
+    actual_hold = [LABELS[int(a)] for a in y_holdout]
+    for i in range(len(predicted_hold)):
+        d.stances[id_holdout[i]]['Predict'] = predicted_hold[i] # Data is unknown
 
     #Run on competition dataset
     predicted_comp = [LABELS[int(a)] for a in best_fold.predict(X_comp)]
     actual_comp = [LABELS[int(a)] for a in y_comp]
-    assign_comp_ids = [i for i in range(len(y_comp)) if predicted_comp[i] in assignclasses]
-    for i in assign_comp_ids: competition_dataset.stances[i]['Predict'] = predicted_comp[i]
+    for i in range(len(actual_comp)):
+        competition_dataset.stances[id_comp[i]]['Predict'] = predicted_comp[i] # Data is unknown
     
-    return (predicted_test, actual_test), (predicted_comp, actual_comp)
+    return id_holdout
 
-if __name__ == "__main__":
-    check_version()
-    parse_params()
-    
-    datapath = '../../'
-
-    #Load the datasets and generate folds
-    global d, competition_dataset
-    d = DataSet(path=datapath)
-    folds,hold_out = kfold_split(d,n_folds=10)
-    fold_stances, hold_out_stances = get_stances_for_folds(d,folds,hold_out)
-    competition_dataset = DataSet("competition_test", path=datapath)
-
-    test, comp = run_stage(generate_features_all, folds, fold_stances, hold_out_stances, ['unrelated'])
-    pred_test,actl_test = test
-    pred_comp,actl_comp = comp
-    
-    # TODO: repeat stages for partial/impartial; agree/disagree
+def print_scores(test, comp, id):
+    pred_test = [s["Predict"] for s in test.get_labelled_stances() if s["Stance ID"] in id]
+    actl_test = [s["Stance"]  for s in test.get_labelled_stances() if s["Stance ID"] in id]
+    pred_comp = [s["Predict"] for s in comp.get_labelled_stances()]
+    actl_comp = [s["Stance"]  for s in comp.get_labelled_stances()]
 
     print("Scores on the dev set")
     report_score(actl_test,pred_test)
@@ -139,3 +132,33 @@ if __name__ == "__main__":
 
     print("Scores on the test set")
     report_score(actl_comp,pred_comp)
+
+if __name__ == "__main__":
+    check_version()
+    parse_params()
+    
+    datapath = '../../'
+
+    d = DataSet(path=datapath)
+    competition_dataset = DataSet("competition_test", path=datapath)
+
+    id = run_stage(generate_features_all, d, competition_dataset)
+    print_scores(d, competition_dataset, id)
+
+    # Clear placeholder values
+    for s in d.stances:
+        s['Predict'] = s['Predict'] if s['Stance']  == 'unrelated' else '?'
+    for s in competition_dataset.stances:
+        s['Predict'] = s['Predict'] if s['Predict'] == 'unrelated' else '?'
+
+    id = run_stage(generate_features_related, d, competition_dataset)
+    print_scores(d, competition_dataset, id)
+
+    # Clear placeholder values
+    for s in d.stances:
+        s['Predict'] = s['Predict'] if s['Stance']  in ['discuss','unrelated'] else '?'
+    for s in competition_dataset.stances:
+        s['Predict'] = s['Predict'] if s['Predict'] in ['discuss','unrelated'] else '?'
+
+    id = run_stage(generate_features_biased, d, competition_dataset)
+    print_scores(d, competition_dataset, id)
