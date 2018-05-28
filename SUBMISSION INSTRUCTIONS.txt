@@ -1,5 +1,7 @@
-1. Copy src/ to a local destination.
-2. Delete all features/ folders from each subfolder of src/.
-3. Compress the new src/ filder copy into a zip file called 'files.zip'.
-4. Export the report Word document to a pdf file called 'report.pdf'.
-5. Submit the assignment using the command: 'give cs9417 ass2 files.zip report.pdf'
+1. Create a new folder called 'files' in a location outside of the GitHub repo.
+2. Copy README.md and src/ to files/.
+3. Delete all features/ folders from each subfolder of files/src/.
+4. Compress files/ into a zip file called 'files.zip'.
+5. Export report.docx to a pdf file called 'report.pdf'.
+6. Ensure that the files being submitted are under 2MB.
+7. Submit the assignment using the command: 'give cs9417 ass2 files.zip report.pdf'.
