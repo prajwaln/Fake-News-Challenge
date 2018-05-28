@@ -6,6 +6,7 @@ from sklearn import feature_extraction
 from tqdm import tqdm
 import operator, math
 
+
 _wnl = nltk.WordNetLemmatizer()
 
 
@@ -93,7 +94,6 @@ def refuting_features(headlines, bodies):
         'hoax',
         'false',
         'deny', 'denies',
-        # 'refute',
         'not',
         'despite',
         'nope',
