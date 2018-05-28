@@ -27,6 +27,7 @@ nltk.download('[packagename]')`
 * _nltk_ packages
    * punkt
    * wordnet
+   * averaged_perceptron_tagger
    
    [1]: http://www.fakenewschallenge.org/ "Fake News Challenge"
    [2]: https://github.com/FakeNewsChallenge/fnc-1-baseline "Baseline FNC implementation"
