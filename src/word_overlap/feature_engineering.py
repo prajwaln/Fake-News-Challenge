@@ -30,6 +30,9 @@ def remove_stopwords(l):
 
 
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
+    dir = os.path.dirname(feature_file)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     create = False
     if not os.path.isfile(feature_file): create = True
     else:
