@@ -31,7 +31,7 @@ nltk.download('[packagename]')`
    [1]: http://www.fakenewschallenge.org/ "Fake News Challenge"
    [2]: https://github.com/FakeNewsChallenge/fnc-1-baseline "Baseline FNC implementation"
 
-## Execution
+## Navigation
 The _data_ folder contains the CSVs provided for the challenge as training data, testing data, and competition benchmarking data.
 
 The _src_ folder contains the baseline code provided, as well as implementations built upon the baseline by us. 
@@ -41,3 +41,17 @@ The _src_ folder contains the baseline code provided, as well as implementations
 | ---------------- | -----------
 | **baseline**     | The baseline provided.
 | **word_overlap** | First implementation. Restructures the classificaiton problem from multi-class to multi-tier two-class, and modifies the word_overlap feature to filter common words.
+
+Each source subfolder contains the following files and folders:
+
+| Item             | Description
+| ---------------- | -----------
+| **fnc_kfold.py** | The main execution script. Extracts CSVs, generates data splits for training/testing, precomputes features, then fits the hold-out set and test data.
+| **feature_engineering.py** | Contains helper functions for feature precomputation.
+| **features/**    | Contains precomputed feature files for later use in fitting the provided data.
+| **utils/**       | Contains helper functions provided in baseline for dataset generation, test split creation, and scoring.
+
+## Execution
+To run the feature generation and scoring process, navigate to any of these source subfolders and run the following commnad:
+
+`python|python3 fnc_kfold.py`
