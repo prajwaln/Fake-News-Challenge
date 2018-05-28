@@ -1,6 +1,4 @@
-import os
-import re
-import nltk
+import os, re, nltk, string
 import numpy as np
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, CountVectorizer, TfidfTransformer
 from sklearn.naive_bayes import MultinomialNB
@@ -11,7 +9,7 @@ from nltk.tokenize import word_tokenize
 from nltk.tag import pos_tag
 
 _wnl = nltk.WordNetLemmatizer()
-_clf = None
+from utils.score import report_score, LABELS, score_submission
 
 
 def normalize_word(w):
@@ -31,6 +29,19 @@ def clean(s):
 def remove_stopwords(l):
     # Removes stopwords from a list of tokens
     return [w for w in l if w not in ENGLISH_STOP_WORDS]
+
+
+def init_features(stances,dataset,repl):
+    id, h, b, y = [],[],[],[]
+
+    for stance in stances:
+        id.append(stance['Stance ID'])
+        s = stance['Stance']
+        y.append(LABELS.index(repl[s] if s in repl else s))
+        h.append(stance['Headline'])
+        b.append(dataset.articles[stance['Body ID']])
+
+    return id, h, b, y
 
 
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
@@ -121,25 +132,70 @@ def get_article_lemmas(headlines, bodies):
     return articles
 
 
-def naive_bayes_train(headlines, bodies, classes):
-    # Naive Bayes classifier
+def naive_bayes_train(fold_stances, dataset, repl):
+    # Naive Bayes classifier, modified for k-folds estimation
     # Source: http://scikit-learn.org/stable/tutorial/text_analytics/working_with_text_data.html
-    articles = []
-    for h, b in zip(headlines, bodies):
-        articles.append(h + " " + b)
-    X_train_counts = CountVectorizer().fit_transform(articles)
-    X_train_tfidf = TfidfTransformer().fit_transform(X_train_counts)
-    global _clf
-    _clf = MultinomialNB().fit(X_train_tfidf, classes)
+    global cvec, tfidf, mnb
+    best_score = 0
+    ids = dict()
+    Hs = dict()
+    Bs = dict()
+    ys = dict()
+    for fold in fold_stances:
+        ids[fold], Hs[fold],Bs[fold],ys[fold] = init_features(fold_stances[fold],dataset,repl)
+    for fold in fold_stances:
+        y_train = np.hstack(tuple([ys[i] for i in range(len(fold_stances)) if i != fold]))
+        id_test = ids[fold]
+        H_test = Hs[fold]
+        B_test = Bs[fold]
+        y_test = ys[fold]
+        
+        articles = []
+        for i in range(len(fold_stances)):
+            if i == fold: continue
+            for h, b in zip(Hs[i], Bs[i]):
+                articles.append(h + " " + b)
+        print('Count Vectoriser...')
+        _cvec = CountVectorizer()
+        X_train_counts = _cvec.fit_transform(articles)
+        _cvec2 = CountVectorizer(vocabulary=string.punctuation)
+        print('TF-IDF Transformer...')
+        _tfidf = TfidfTransformer()
+        X_train_tfidf = _tfidf.fit_transform(X_train_counts)
+        print('Multinomial Naive Bayes fit...')
+        _mnb = MultinomialNB().fit(X_train_tfidf, y_train)
+        
+        print('Testing...')
+        articles = []
+        for h, b in zip(H_test, B_test):
+            articles.append(h + " " + b)
+        X_test_counts = _cvec.transform(articles)
+        X_test_tfidf = _tfidf.transform(X_test_counts)
 
+        predicted_test = [LABELS[int(a)] for a in _mnb.predict(X_test_tfidf)]
+        actual_test = [LABELS[int(a)] for a in y_test]
+        for i in range(len(actual_test)):
+            dataset.stances[id_test[i]]['Predict'] = actual_test[i] # Data is known
+
+        fold_score, _ = score_submission(actual_test, predicted_test)
+        max_fold_score, _ = score_submission(actual_test, actual_test)
+
+        score = fold_score/max_fold_score
+
+        print("Score for fold " + str(fold) + " was - " + str(score))
+        if score > best_score:
+            best_score = score
+            cvec = _cvec
+            tfidf = _tfidf
+            mnb = _mnb
 
 def naive_bayes_features(headlines, bodies):
     articles = []
     for i, (h, b) in tqdm(enumerate(zip(headlines, bodies))):
         articles.append(h + " " + b)
-    X_train_counts = CountVectorizer().fit_transform(articles)
-    X_train_tfidf = TfidfTransformer().fit_transform(X_train_counts)
-    X = _clf.predict_proba(X_train_tfidf)
+    X_test_counts = cvec.transform(articles)
+    X_test_tfidf = tfidf.transform(X_test_counts)
+    X = mnb.predict_log_proba(X_test_tfidf)
     return X
 
 
