@@ -2,7 +2,8 @@ import os
 import re
 import nltk
 import numpy as np
-from sklearn import feature_extraction
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, CountVectorizer, TfidfTransformer
+from sklearn.naive_bayes import MultinomialNB
 from tqdm import tqdm
 import operator, math
 from nltk.corpus import wordnet as wn
@@ -10,6 +11,7 @@ from nltk.tokenize import word_tokenize
 from nltk.tag import pos_tag
 
 _wnl = nltk.WordNetLemmatizer()
+_clf = None
 
 
 def normalize_word(w):
@@ -28,7 +30,7 @@ def clean(s):
 
 def remove_stopwords(l):
     # Removes stopwords from a list of tokens
-    return [w for w in l if w not in feature_extraction.text.ENGLISH_STOP_WORDS]
+    return [w for w in l if w not in ENGLISH_STOP_WORDS]
 
 
 def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
@@ -50,7 +52,8 @@ def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
 
 
 def get_commonwords(l):
-    # Identifies common, homogeneous words across multiple articles
+    # Generates a measure of how common/unusual words are across multiple articles
+    # Achieves a similar purpose TfidfTransformer, and is more general than a stopword filter.
     # Added by Julian
     counts = {}
     for headline, body in l:
@@ -106,8 +109,8 @@ def paraphrase_line(headline):
                     paraphrases.extend(new_words)  
     return paraphrases  
 
-def word_overlap_features(headlines, bodies):
-    X = []
+
+def get_article_lemmas(headlines, bodies):
     articles = []
     for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
@@ -115,6 +118,34 @@ def word_overlap_features(headlines, bodies):
         clean_headline = get_tokenized_lemmas(clean_headline)
         clean_body = get_tokenized_lemmas(clean_body)
         articles.append((clean_headline, clean_body))
+    return articles
+
+
+def naive_bayes_train(headlines, bodies, classes):
+    # Naive Bayes classifier
+    # Source: http://scikit-learn.org/stable/tutorial/text_analytics/working_with_text_data.html
+    articles = []
+    for h, b in zip(headlines, bodies):
+        articles.append(h + " " + b)
+    X_train_counts = CountVectorizer().fit_transform(articles)
+    X_train_tfidf = TfidfTransformer().fit_transform(X_train_counts)
+    global _clf
+    _clf = MultinomialNB().fit(X_train_tfidf, classes)
+
+
+def naive_bayes_features(headlines, bodies):
+    articles = []
+    for i, (h, b) in tqdm(enumerate(zip(headlines, bodies))):
+        articles.append(h + " " + b)
+    X_train_counts = CountVectorizer().fit_transform(articles)
+    X_train_tfidf = TfidfTransformer().fit_transform(X_train_counts)
+    X = _clf.predict_proba(X_train_tfidf)
+    return X
+
+
+def word_overlap_features(headlines, bodies):
+    X = []
+    articles = get_article_lemmas(headlines, bodies)
     common_words = get_commonwords(articles)
     for clean_headline, clean_body in articles:
         clean_headline = [x for x in clean_headline if x not in common_words]
