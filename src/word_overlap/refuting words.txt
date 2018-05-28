@@ -1,0 +1,16 @@
+_refuting_words = [
+        'fake', 'falsely marked', 'counterfeit', 'falsified', 'bogus', 'fictitious', 'counterfeited', 'counterfeiting', 'forged', 'phony', 'forgery', 'spurious',
+        'fraud', 'fraudulent', 'deception', 'cheating', 'deceit', 'scam', 'fraudster', 'embezzlement', 'swindling', 'rigged',
+        'hoax', 
+        'false', 'falsification', 'erroneous', 'fallacious', 'incorrect', 'misleading', 'untrue', 'wrong', 'mistaken', 'inaccurate', 'disingenuous', 'misguided', 'untruthful', 'deceptive', 'faulty', 
+        'deny', 'denies', 'denied', 'refused', 'deprive', 'refuse', 'reject', 'negate', 'withhold', 'disallow', 'repudiate', 'dismiss', 'ignore', 'denial'
+        # 'refute',
+        'not', 'prevented', 'excluded', 'prohibited', 'omitted', 'avoided', 'neglected', 'ceased', 'lacked', 'rejected', 'opposed', 'declined', 'deprived', 'failed', 'missed', 'disabled', 'lost'
+        'despite', 'notwithstanding', 
+        'nope', 'disagreed', 'lied', 'lacked',
+        'doubt', 'doubts',
+        'bogus', 
+        'debunk',
+        'pranks', 'prank', 'farce',
+        'retract', 'withdraw', 'remove', 'revoke', 'renounce'
+    ]
