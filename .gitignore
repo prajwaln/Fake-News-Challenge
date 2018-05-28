@@ -99,3 +99,14 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# Our additions
+*.tag*
+splits/*.txt
+features/*.npy
+*.pyc
+.DS_Store
+.idea
+__pycache__
+*.npy
+~$*
