@@ -5,9 +5,6 @@ import numpy as np
 from sklearn import feature_extraction
 from tqdm import tqdm
 import operator, math
-from nltk.corpus import wordnet as wn
-from nltk.tokenize import word_tokenize
-from nltk.tag import pos_tag
 
 _wnl = nltk.WordNetLemmatizer()
 
@@ -69,42 +66,6 @@ def get_commonwords(l):
     sorted_counts = sorted(counts.items(), key=operator.itemgetter(1))
     return [k for k,v in sorted_counts[:int(0.005 * len(sorted_counts))]]
 
-# Paraphrase related code ++
-
-def tag(sentence):
-    words = word_tokenize(sentence)
-    words = pos_tag(words)
-    return words
-
-def paraphraseable(tag):
-    return tag.startswith('NN') or tag == 'VB' or tag.startswith('JJ')
-
-def pos(tag):
-    if tag.startswith('NN'):
-        return wn.NOUN
-    elif tag.startswith('V'):
-        return wn.VERB
-
-def synonyms(word, tag):
-    lemma_lists = [ss.lemmas() for ss in wn.synsets(word, pos(tag))]
-    lemmas = [lemma.name() for lemma in sum(lemma_lists, [])]
-    return set(lemmas)
-
-# Paraphrase related code --   
-    
-def paraphrase_line(headline):
-    # Extends the words in headline with paraphrases for each original word
-    # Added by Prajwal
-    hl_set = set(headline)
-    paraphrases = []
-    for (w, t) in tag(headline):
-        if paraphraseable(t):
-            syns = synonyms(w, t)
-            if syns:
-                if len(syns) > 1:
-                    new_words = syns - hl_set                    
-                    paraphrases.extend(new_words)  
-    return paraphrases  
 
 def word_overlap_features(headlines, bodies):
     X = []
@@ -256,19 +217,6 @@ def hand_features(headlines, bodies):
                 bin_count_early += 1
         return [bin_count, bin_count_early]
 
-    def binary_co_occurence_paraphrase(headline, body):
-        # Count how many times a word in the headline or its paraphrase
-        # appears in the body text.
-        # Added by Prajwal
-        bin_count = 0
-        bin_count_early = 0
-        for headline_token in paraphrase_line(headline):
-            if headline_token in body:
-                bin_count += 1
-            if headline_token in body[:255]:
-                bin_count_early += 1
-        return [bin_count, bin_count_early]
-
     def count_grams(headline, body):
         # Count how many times an n-gram of the title
         # appears in the entire body, and intro paragraph
@@ -301,7 +249,6 @@ def hand_features(headlines, bodies):
         clean_body = re.sub(common_words, '', clean_body)
         X.append(binary_co_occurence(clean_headline, clean_body)
                  + binary_co_occurence_stops(clean_headline, clean_body)
-                 + binary_co_occurence_paraphrase(clean_headline, clean_body)
                  + count_grams(clean_headline, clean_body))
 
 
