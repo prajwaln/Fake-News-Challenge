@@ -38,10 +38,11 @@ The _data_ folder contains the CSVs provided for the challenge as training data,
 The _src_ folder contains the baseline code provided, as well as implementations built upon the baseline by us. 
 
 ### Source subfolders
-| Subfolder        | Description
-| ---------------- | -----------
-| **baseline**     | The baseline provided.
-| **word_overlap** | First implementation. Restructures the classificaiton problem from multi-class to multi-tier two-class, and modifies the word_overlap feature to filter common words.
+| Subfolder        | Version | Description
+| ---------------- | ------- | -----------
+| **baseline**     | 0       | The baseline provided.
+| **word_overlap** | 1       | Restructures the classificaiton problem from multi-class to multi-tier two-class, and modifies the word_overlap feature to filter common words.
+| **paraphrasing** | 2       | **TODO: WRITE DESCRIPTION**
 
 Each source subfolder contains the following files and folders:
 
