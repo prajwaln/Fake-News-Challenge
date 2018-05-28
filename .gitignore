@@ -102,12 +102,9 @@ ENV/
 
 # Our additions
 *.tag*
-src/**/splits/*.txt
-src/**/features/*.npy
 *.pyc
 .DS_Store
 .idea
 __pycache__
 *.npy
 ~$*
-src/**/logs/*
