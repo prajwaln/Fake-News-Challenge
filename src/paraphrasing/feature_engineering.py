@@ -7,9 +7,9 @@ import operator, math
 from nltk.corpus import wordnet as wn
 from nltk.tokenize import word_tokenize
 from nltk.tag import pos_tag
+from utils.score import report_score, LABELS, score_submission
 
 _wnl = nltk.WordNetLemmatizer()
-from utils.score import report_score, LABELS, score_submission
 
 
 def normalize_word(w):
@@ -155,17 +155,13 @@ def naive_bayes_train(fold_stances, dataset, repl):
             if i == fold: continue
             for h, b in zip(Hs[i], Bs[i]):
                 articles.append(h + " " + b)
-        print('Count Vectoriser...')
         _cvec = CountVectorizer()
         X_train_counts = _cvec.fit_transform(articles)
         _cvec2 = CountVectorizer(vocabulary=string.punctuation)
-        print('TF-IDF Transformer...')
         _tfidf = TfidfTransformer()
         X_train_tfidf = _tfidf.fit_transform(X_train_counts)
-        print('Multinomial Naive Bayes fit...')
         _mnb = MultinomialNB().fit(X_train_tfidf, y_train)
         
-        print('Testing...')
         articles = []
         for h, b in zip(H_test, B_test):
             articles.append(h + " " + b)
@@ -268,6 +264,34 @@ def polarity_features(headlines, bodies):
         features.append(calculate_polarity(clean_body))
         X.append(features)
     return np.array(X)
+
+
+def format_features(headlines, bodies):
+    X = []
+    punc_all = {}
+    total_caps = 0
+    punc_list = ['?','!',':']
+    for p in punc_list:
+        punc_all[p] = 0
+    for headline, body in zip(headlines, bodies):
+        str = headline + body
+        punct_article = re.findall(r'[^A-Za-z0-9 \n]', str)
+        for p in punct_article:
+            if p in punc_list: punc_all[p] += 1
+        total_caps += len(re.findall(r'\b[A-Z]+[A-Z]\b', str))
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        features = []
+        str = headline + body
+        all_caps = re.findall(r'\b[A-Z]+[A-Z]\b', str)
+        features.append(len(all_caps)/total_caps/len(str))
+        # punct_article = re.findall(r'[^A-Za-z0-9 \n]', str)
+        # punc_tally = {}
+        # for p in punc_all:      punc_tally[p] = 0
+        # for p in punct_article: 
+            # if p in punc_all:   punc_tally[p] += 1
+        # for p in punc_tally:    features.append(punc_tally[p]/punc_all[p]/len(str) if punc_all[p] > 0 else 0)
+        X.append(features)
+    return X
 
 
 def ngrams(input, n):
