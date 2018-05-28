@@ -1,0 +1,5 @@
+1. Copy src/ to a local destination.
+2. Delete all features/ folders from each subfolder of src/.
+3. Compress the new src/ filder copy into a zip file called 'files.zip'.
+4. Export the report Word document to a pdf file called 'report.pdf'.
+5. Submit the assignment using the command: 'give cs9417 ass2 files.zip report.pdf'
