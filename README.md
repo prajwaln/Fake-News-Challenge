@@ -4,7 +4,7 @@ _Prajwal Rao (5176504) & Julian Blair (3463793) | COMP9417 2018s1_
 ## Acknowledgement
 The Fake News Challenge was hosted in 2017 by a group of academic and industry volunteers. Learn more about the challenge [here][1].
 
-Thanks to the same team for providing a baseline implementation, which was used as a starting point for our project The GitHub repository for the baseline can be found [here][2]. 
+Thanks to the same team for providing a baseline implementation, which was used as a starting point for our project. The GitHub repository for the baseline can be found [here][2]. 
 
 ## Install
 Python packages can be installed via commandline using:
