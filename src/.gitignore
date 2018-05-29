@@ -1,9 +1,3 @@
-*.tag*
-splits/*.txt
-features/*.npy
-*.pyc
-.DS_Store
-.idea
-__pycache__
-*.npy
-~$*
+**/utils/*.txt
+**/features/*
+**/logs/*
