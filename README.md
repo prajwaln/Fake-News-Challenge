@@ -43,6 +43,7 @@ The _src_ folder contains the baseline code provided, as well as implementations
 | **baseline**     | 0       | The baseline provided.
 | **word_overlap** | 1       | Restructures the classificaiton problem from multi-class to multi-tier two-class, and modifies the word_overlap feature to filter common words.
 | **paraphrasing** | 2       | **TODO: WRITE DESCRIPTION**
+| **final**        | 3       | Adds Naive Bayes classifier and all caps frequency feature.
 
 Each source subfolder contains the following files and folders:
 
