@@ -2,9 +2,8 @@ import sys
 import numpy as np
 
 from sklearn.ensemble import GradientBoostingClassifier
-from feature_engineering import init_features, refuting_features, polarity_features, hand_features, \
-                                gen_or_load_feats, word_overlap_features, naive_bayes_features, \
-                                naive_bayes_train, format_features
+from feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
+from feature_engineering import word_overlap_features
 from utils.dataset import DataSet
 from utils.generate_test_splits import kfold_split, get_stances_for_folds
 from utils.score import report_score, LABELS, score_submission
@@ -13,9 +12,21 @@ from utils.system import parse_params, check_version
 
 runpass = 0
 
-def generate_features_all(stances,dataset,name,repl):
+def init_features(stances,dataset,repl={}):
+    id, h, b, y = [],[],[],[]
+
+    for stance in stances:
+        id.append(stance['Stance ID'])
+        s = stance['Stance']
+        y.append(LABELS.index(repl[s] if s in repl else s))
+        h.append(stance['Headline'])
+        b.append(dataset.articles[stance['Body ID']])
+
+    return id, h, b, y
+
+def generate_features_all(stances,dataset,name):
     # Pass all articles through here first
-    id, h, b, y = init_features(stances,dataset,repl)
+    id, h, b, y = init_features(stances,dataset,{'agree':'discuss','disagree':'discuss'})
 
     X_overlap = gen_or_load_feats(word_overlap_features, h, b, "features/overlap."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
@@ -23,22 +34,9 @@ def generate_features_all(stances,dataset,name,repl):
     X = np.c_[X_overlap, X_hand]
     return X,y,id
 
-def generate_features_related(stances,dataset,name,repl):
+def generate_features_related(stances,dataset,name):
     # Pass related articles through here second
-    id, h, b, y = init_features(stances,dataset,repl)
-
-    X_bayes = gen_or_load_feats(naive_bayes_features, h, b, "features/bayes."+name+".npy")
-    X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
-    X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
-    X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
-    X_format = gen_or_load_feats(format_features, h, b, "features/format."+name+".npy")
-
-    X = np.c_[X_polarity, X_refuting, X_hand, X_bayes, X_format]
-    return X,y,id
-
-def generate_features_biased(stances,dataset,name,repl):
-    # Pass biased articles through here third
-    id, h, b, y = init_features(stances,dataset,repl)
+    id, h, b, y = init_features(stances,dataset,{'agree':'disagree'})
 
     X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
     X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
@@ -47,27 +45,33 @@ def generate_features_biased(stances,dataset,name,repl):
     X = np.c_[X_polarity, X_refuting, X_hand]
     return X,y,id
 
-def run_stage(fn, d, competition_dataset, repl={}, bayes=True):
+def generate_features_biased(stances,dataset,name):
+    # Pass biased articles through here third
+    id, h, b, y = init_features(stances,dataset)
+
+    X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
+    X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
+    X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
+
+    X = np.c_[X_polarity, X_refuting, X_hand]
+    return X,y,id
+
+def run_stage(fn, d, competition_dataset):
     global runpass
     runpass += 1
     
     folds,hold_out = kfold_split(d,n_folds=10)
     fold_stances, hold_out_stances = get_stances_for_folds(d,folds,hold_out)
     
-    # Train Naive Bayes
-    if bayes:
-        print('Training Naive Bayes classifier...')
-        naive_bayes_train(fold_stances, d, repl)    
-    
     # Load/Precompute all features now
     Xs = dict()
     ys = dict()
     ids = dict()
     comp_stances = competition_dataset.get_unlabelled_stances()
-    X_comp,y_comp,id_comp = fn(comp_stances,competition_dataset,"competition_{}".format(str(runpass)),repl)
-    X_holdout,y_holdout,id_holdout = fn(hold_out_stances,d,"holdout_{}".format(str(runpass)),repl)
+    X_comp,y_comp,id_comp = fn(comp_stances,competition_dataset,"competition_{}".format(str(runpass)))
+    X_holdout,y_holdout,id_holdout = fn(hold_out_stances,d,"holdout_{}".format(str(runpass)))
     for fold in fold_stances:
-        Xs[fold],ys[fold],ids[fold] = fn(fold_stances[fold],d,"{}_{}".format(str(fold),str(runpass)),repl)
+        Xs[fold],ys[fold],ids[fold] = fn(fold_stances[fold],d,"{}_{}".format(str(fold),str(runpass)))
 
 
     best_score = 0
@@ -138,7 +142,7 @@ if __name__ == "__main__":
     d = DataSet(path=datapath)
     competition_dataset = DataSet("competition_test", path=datapath)
 
-    id = run_stage(generate_features_all, d, competition_dataset, {'agree':'discuss','disagree':'discuss'}, bayes=False)
+    id = run_stage(generate_features_all, d, competition_dataset)
     print_scores(d, competition_dataset, id)
 
     # Clear placeholder values
@@ -147,7 +151,7 @@ if __name__ == "__main__":
     for s in competition_dataset.stances:
         s['Predict'] = s['Predict'] if s['Predict'] == 'unrelated' else '?'
 
-    id = run_stage(generate_features_related, d, competition_dataset, {'agree':'disagree'})
+    id = run_stage(generate_features_related, d, competition_dataset)
     print_scores(d, competition_dataset, id)
 
     # Clear placeholder values
@@ -156,5 +160,5 @@ if __name__ == "__main__":
     for s in competition_dataset.stances:
         s['Predict'] = s['Predict'] if s['Predict'] in ['discuss','unrelated'] else '?'
 
-    id = run_stage(generate_features_biased, d, competition_dataset, bayes=False)
+    id = run_stage(generate_features_biased, d, competition_dataset)
     print_scores(d, competition_dataset, id)
