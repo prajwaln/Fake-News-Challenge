@@ -1,164 +1,308 @@
-import sys
+import os
+import re
+import nltk
 import numpy as np
+from sklearn import feature_extraction
+from tqdm import tqdm
+import operator, math
+from nltk.corpus import wordnet as wn
+from nltk.tokenize import word_tokenize
+from nltk.tag import pos_tag
 
-from sklearn.ensemble import GradientBoostingClassifier
-from feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
-from feature_engineering import word_overlap_features
-from utils.dataset import DataSet
-from utils.generate_test_splits import kfold_split, get_stances_for_folds
-from utils.score import report_score, LABELS, score_submission
+_wnl = nltk.WordNetLemmatizer()
 
-from utils.system import parse_params, check_version
 
-runpass = 0
+def normalize_word(w):
+    return _wnl.lemmatize(w).lower()
 
-def init_features(stances,dataset,repl={}):
-    id, h, b, y = [],[],[],[]
 
-    for stance in stances:
-        id.append(stance['Stance ID'])
-        s = stance['Stance']
-        y.append(LABELS.index(repl[s] if s in repl else s))
-        h.append(stance['Headline'])
-        b.append(dataset.articles[stance['Body ID']])
+def get_tokenized_lemmas(s):
+    return [normalize_word(t) for t in nltk.word_tokenize(s)]
 
-    return id, h, b, y
 
-def generate_features_all(stances,dataset,name):
-    # Pass all articles through here first
-    id, h, b, y = init_features(stances,dataset,{'agree':'discuss','disagree':'discuss'})
+def clean(s):
+    # Cleans a string: Lowercasing, trimming, removing non-alphanumeric
 
-    X_overlap = gen_or_load_feats(word_overlap_features, h, b, "features/overlap."+name+".npy")
-    X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
+    return " ".join(re.findall(r'\w+', s, flags=re.UNICODE)).lower()
 
-    X = np.c_[X_overlap, X_hand]
-    return X,y,id
 
-def generate_features_related(stances,dataset,name):
-    # Pass related articles through here second
-    id, h, b, y = init_features(stances,dataset,{'agree':'disagree'})
+def remove_stopwords(l):
+    # Removes stopwords from a list of tokens
+    return [w for w in l if w not in feature_extraction.text.ENGLISH_STOP_WORDS]
 
-    X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
-    X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
-    X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
 
-    X = np.c_[X_polarity, X_refuting, X_hand]
-    return X,y,id
+def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
+    dir = os.path.dirname(feature_file)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    create = False
+    if not os.path.isfile(feature_file): create = True
+    else:
+        X = np.load(feature_file)
+        if X.shape[0] != len(headlines): create = True
+    if create:
+        print("Creating {}...".format(feature_file))
+        feats = feat_fn(headlines, bodies)
+        np.save(feature_file, feats)
+        X = np.load(feature_file)
 
-def generate_features_biased(stances,dataset,name):
-    # Pass biased articles through here third
-    id, h, b, y = init_features(stances,dataset)
+    return X
 
-    X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
-    X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
-    X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
 
-    X = np.c_[X_polarity, X_refuting, X_hand]
-    return X,y,id
+def get_commonwords(l):
+    # Identifies common, homogeneous words across multiple articles
+    # Added by Julian
+    counts = {}
+    for headline, body in l:
+        article = headline + body
+        article_words = {}
+        for word in article:
+            if word not in article_words: article_words[word] = 0
+            article_words[word] += 1
+        for word, count in article_words.items():
+            if word not in counts: counts[word] = []
+            counts[word].append(count/len(article))
+    for word, c_list in counts.items():
+        mean = sum(c_list)/len(l)
+        sd = math.sqrt(sum([(x-mean)**2 for x in c_list])/len(l))
+        counts[word] = sd/mean
+    sorted_counts = sorted(counts.items(), key=operator.itemgetter(1))
+    return [k for k,v in sorted_counts[:int(0.005 * len(sorted_counts))]]
 
-def run_stage(fn, d, competition_dataset):
-    global runpass
-    runpass += 1
+# Paraphrase related code ++
+
+def tag(sentence):
+    words = word_tokenize(sentence)
+    words = pos_tag(words)
+    return words
+
+def paraphraseable(tag):
+    return tag.startswith('NN') or tag == 'VB' or tag.startswith('JJ')
+
+def pos(tag):
+    if tag.startswith('NN'):
+        return wn.NOUN
+    elif tag.startswith('V'):
+        return wn.VERB
+
+def synonyms(word, tag):
+    lemma_lists = [ss.lemmas() for ss in wn.synsets(word, pos(tag))]
+    lemmas = [lemma.name() for lemma in sum(lemma_lists, [])]
+    return set(lemmas)
+
+# Paraphrase related code --   
     
-    folds,hold_out = kfold_split(d,n_folds=10)
-    fold_stances, hold_out_stances = get_stances_for_folds(d,folds,hold_out)
-    
-    # Load/Precompute all features now
-    Xs = dict()
-    ys = dict()
-    ids = dict()
-    comp_stances = competition_dataset.get_unlabelled_stances()
-    X_comp,y_comp,id_comp = fn(comp_stances,competition_dataset,"competition_{}".format(str(runpass)))
-    X_holdout,y_holdout,id_holdout = fn(hold_out_stances,d,"holdout_{}".format(str(runpass)))
-    for fold in fold_stances:
-        Xs[fold],ys[fold],ids[fold] = fn(fold_stances[fold],d,"{}_{}".format(str(fold),str(runpass)))
+def paraphrase_line(headline):
+    # Extends the words in headline with paraphrases for each original word
+    # Added by Prajwal
+    hl_set = set(headline)
+    paraphrases = []
+    for (w, t) in tag(headline):
+        if paraphraseable(t):
+            syns = synonyms(w, t)
+            if syns:
+                if len(syns) > 1:
+                    new_words = syns - hl_set                    
+                    paraphrases.extend(new_words)  
+    return paraphrases  
+
+def word_overlap_features(headlines, bodies):
+    X = []
+    articles = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_body = clean(body)
+        clean_headline = get_tokenized_lemmas(clean_headline)
+        clean_body = get_tokenized_lemmas(clean_body)
+        articles.append((clean_headline, clean_body))
+    common_words = get_commonwords(articles)
+    for clean_headline, clean_body in articles:
+        clean_headline = [x for x in clean_headline if x not in common_words]
+        clean_body = [x for x in clean_body if x not in common_words]
+        features = [
+            len(set(clean_headline).intersection(clean_body)) / float(len(set(clean_headline).union(clean_body)))]
+        X.append(features)
+    return X
 
 
-    best_score = 0
-    best_fold = None
+def refuting_features(headlines, bodies):
+    _refuting_words = [
+        'fake',
+        'fraud',
+        'hoax',
+        'false',
+        'deny', 'denies',
+        # 'refute',
+        'not',
+        'despite',
+        'nope',
+        'doubt', 'doubts',
+        'bogus',
+        'debunk',
+        'pranks',
+        'retract'
+    ]
+    X = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_headline = get_tokenized_lemmas(clean_headline)
+        features = [1 if word in clean_headline else 0 for word in _refuting_words]
+        X.append(features)
+    return X
 
 
-    # Classifier for each fold
-    for fold in fold_stances:
-        id_train = np.hstack(tuple([ids[i] for i in range(len(fold_stances)) if i != fold]))
-        X_train = np.vstack(tuple([Xs[i] for i in range(len(fold_stances)) if i != fold]))
-        y_train = np.hstack(tuple([ys[i] for i in range(len(fold_stances)) if i != fold]))
-        id_test = ids[fold]
-        X_test = Xs[fold]
-        y_test = ys[fold]
+def polarity_features(headlines, bodies):
+    _refuting_words = [
+        'fake',
+        'fraud',
+        'hoax',
+        'false',
+        'deny', 'denies',
+        # 'refute',
+        'not',
+        'despite',
+        'nope',
+        'doubt', 'doubts',
+        'bogus',
+        'debunk',
+        'pranks',
+        'retract'
+    ]
 
-        clf = GradientBoostingClassifier(n_estimators=200, random_state=14128, verbose=True)
-        clf.fit(X_train, y_train)
+    def calculate_polarity(text):
+        tokens = get_tokenized_lemmas(text)
+        return sum([t in _refuting_words for t in tokens]) % 2
+    X = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_body = clean(body)
+        features = []
+        features.append(calculate_polarity(clean_headline))
+        features.append(calculate_polarity(clean_body))
+        X.append(features)
+    return np.array(X)
 
-        predicted_test = [LABELS[int(a)] for a in clf.predict(X_test)]
-        actual_test = [LABELS[int(a)] for a in y_test]
-        for i in range(len(actual_test)):
-            d.stances[id_test[i]]['Predict'] = actual_test[i] # Data is known
 
-        fold_score, _ = score_submission(actual_test, predicted_test)
-        max_fold_score, _ = score_submission(actual_test, actual_test)
+def ngrams(input, n):
+    input = input.split(' ')
+    output = []
+    for i in range(len(input) - n + 1):
+        output.append(input[i:i + n])
+    return output
 
-        score = fold_score/max_fold_score
 
-        print("Score for fold "+ str(fold) + " was - " + str(score))
-        if score > best_score:
-            best_score = score
-            best_fold = clf
+def chargrams(input, n):
+    output = []
+    for i in range(len(input) - n + 1):
+        output.append(input[i:i + n])
+    return output
 
-    #Run on Holdout set and report the final score on the holdout set
-    predicted_hold = [LABELS[int(a)] for a in best_fold.predict(X_holdout)]
-    actual_hold = [LABELS[int(a)] for a in y_holdout]
-    for i in range(len(predicted_hold)):
-        d.stances[id_holdout[i]]['Predict'] = predicted_hold[i] # Data is unknown
 
-    #Run on competition dataset
-    predicted_comp = [LABELS[int(a)] for a in best_fold.predict(X_comp)]
-    actual_comp = [LABELS[int(a)] for a in y_comp]
-    for i in range(len(actual_comp)):
-        competition_dataset.stances[id_comp[i]]['Predict'] = predicted_comp[i] # Data is unknown
-    
-    return id_holdout
+def append_chargrams(features, text_headline, text_body, size):
+    grams = [' '.join(x) for x in chargrams(" ".join(remove_stopwords(text_headline.split())), size)]
+    grams_hits = 0
+    grams_early_hits = 0
+    grams_first_hits = 0
+    for gram in grams:
+        if gram in text_body:
+            grams_hits += 1
+        if gram in text_body[:255]:
+            grams_early_hits += 1
+        if gram in text_body[:100]:
+            grams_first_hits += 1
+    features.append(grams_hits)
+    features.append(grams_early_hits)
+    features.append(grams_first_hits)
+    return features
 
-def print_scores(test, comp, id):
-    pred_test = [s["Predict"] for s in test.get_labelled_stances() if s["Stance ID"] in id]
-    actl_test = [s["Stance"]  for s in test.get_labelled_stances() if s["Stance ID"] in id]
-    pred_comp = [s["Predict"] for s in comp.get_labelled_stances()]
-    actl_comp = [s["Stance"]  for s in comp.get_labelled_stances()]
 
-    print("Scores on the dev set")
-    report_score(actl_test,pred_test)
-    print("")
-    print("")
+def append_ngrams(features, text_headline, text_body, size):
+    grams = [' '.join(x) for x in ngrams(text_headline, size)]
+    grams_hits = 0
+    grams_early_hits = 0
+    for gram in grams:
+        if gram in text_body:
+            grams_hits += 1
+        if gram in text_body[:255]:
+            grams_early_hits += 1
+    features.append(grams_hits)
+    features.append(grams_early_hits)
+    return features
 
-    print("Scores on the test set")
-    report_score(actl_comp,pred_comp)
 
-if __name__ == "__main__":
-    check_version()
-    parse_params()
-    
-    datapath = '../../'
+def hand_features(headlines, bodies):
 
-    d = DataSet(path=datapath)
-    competition_dataset = DataSet("competition_test", path=datapath)
+    def binary_co_occurence(headline, body):
+        # Count how many times a token in the title
+        # appears in the body text.
+        bin_count = 0
+        bin_count_early = 0
+        for headline_token in headline.split(" "):
+            if headline_token in body:
+                bin_count += 1
+            if headline_token in body[:255]:
+                bin_count_early += 1
+        return [bin_count, bin_count_early]
 
-    id = run_stage(generate_features_all, d, competition_dataset)
-    print_scores(d, competition_dataset, id)
+    def binary_co_occurence_stops(headline, body):
+        # Count how many times a token in the title
+        # appears in the body text. Stopwords in the title
+        # are ignored.
+        bin_count = 0
+        bin_count_early = 0
+        for headline_token in remove_stopwords(headline.split(" ")):
+            if headline_token in body:
+                bin_count += 1
+                bin_count_early += 1
+        return [bin_count, bin_count_early]
 
-    # Clear placeholder values
-    for s in d.stances:
-        s['Predict'] = s['Predict'] if s['Stance']  == 'unrelated' else '?'
-    for s in competition_dataset.stances:
-        s['Predict'] = s['Predict'] if s['Predict'] == 'unrelated' else '?'
+    def binary_co_occurence_paraphrase(headline, body):
+        # Count how many times a word in the headline or its paraphrase
+        # appears in the body text.
+        # Added by Prajwal
+        bin_count = 0
+        bin_count_early = 0
+        for headline_token in paraphrase_line(headline):
+            if headline_token in body:
+                bin_count += 1
+            if headline_token in body[:255]:
+                bin_count_early += 1
+        return [bin_count, bin_count_early]
 
-    id = run_stage(generate_features_related, d, competition_dataset)
-    print_scores(d, competition_dataset, id)
+    def count_grams(headline, body):
+        # Count how many times an n-gram of the title
+        # appears in the entire body, and intro paragraph
 
-    # Clear placeholder values
-    for s in d.stances:
-        s['Predict'] = s['Predict'] if s['Stance']  in ['discuss','unrelated'] else '?'
-    for s in competition_dataset.stances:
-        s['Predict'] = s['Predict'] if s['Predict'] in ['discuss','unrelated'] else '?'
+        features = []
+        features = append_chargrams(features, clean_headline, clean_body, 2)
+        features = append_chargrams(features, clean_headline, clean_body, 8)
+        features = append_chargrams(features, clean_headline, clean_body, 4)
+        features = append_chargrams(features, clean_headline, clean_body, 16)
+        features = append_ngrams(features, clean_headline, clean_body, 2)
+        features = append_ngrams(features, clean_headline, clean_body, 3)
+        features = append_ngrams(features, clean_headline, clean_body, 4)
+        features = append_ngrams(features, clean_headline, clean_body, 5)
+        features = append_ngrams(features, clean_headline, clean_body, 6)
+        return features
 
-    id = run_stage(generate_features_biased, d, competition_dataset)
-    print_scores(d, competition_dataset, id)
+    X = []
+    articles = []
+    lemmas = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_body = clean(body)
+        articles.append((clean_headline, clean_body))
+        clean_headline_l = get_tokenized_lemmas(clean_headline)
+        clean_body_l = get_tokenized_lemmas(clean_body)
+        lemmas.append((clean_headline_l, clean_body_l))
+    common_words = r'(\b{}\b)'.format('\\b|\\b'.join(get_commonwords(lemmas)))
+    for clean_headline, clean_body in articles:
+        clean_headline = re.sub(common_words, '', clean_headline)
+        clean_body = re.sub(common_words, '', clean_body)
+        X.append(binary_co_occurence(clean_headline, clean_body)
+                 + binary_co_occurence_stops(clean_headline, clean_body)
+                 + binary_co_occurence_paraphrase(clean_headline, clean_body)
+                 + count_grams(clean_headline, clean_body))
+
+
+    return X
