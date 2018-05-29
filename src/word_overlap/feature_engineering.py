@@ -6,7 +6,6 @@ from sklearn import feature_extraction
 from tqdm import tqdm
 import operator, math
 
-
 _wnl = nltk.WordNetLemmatizer()
 
 
