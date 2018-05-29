@@ -4,7 +4,7 @@ _Prajwal Rao (5176504) & Julian Blair (3463793) | COMP9417 2018s1_
 ## Acknowledgement
 The Fake News Challenge was hosted in 2017 by a group of academic and industry volunteers. Learn more about the challenge [here][1].
 
-Thanks to the same team for providing a baseline implementation, which was used as a starting point for our project The GitHub repository for the baseline can be found [here][2]. 
+Thanks to the same team for providing a baseline implementation, which was used as a starting point for our project. The GitHub repository for the baseline can be found [here][2]. 
 
 ## Install
 Python packages can be installed via commandline using:
@@ -27,6 +27,7 @@ nltk.download('[packagename]')`
 * _nltk_ packages
    * punkt
    * wordnet
+   * averaged_perceptron_tagger
    
    [1]: http://www.fakenewschallenge.org/ "Fake News Challenge"
    [2]: https://github.com/FakeNewsChallenge/fnc-1-baseline "Baseline FNC implementation"
@@ -37,10 +38,12 @@ The _data_ folder contains the CSVs provided for the challenge as training data,
 The _src_ folder contains the baseline code provided, as well as implementations built upon the baseline by us. 
 
 ### Source subfolders
-| Subfolder        | Description
-| ---------------- | -----------
-| **baseline**     | The baseline provided.
-| **word_overlap** | First implementation. Restructures the classificaiton problem from multi-class to multi-tier two-class, and modifies the word_overlap feature to filter common words.
+| Subfolder        | Version | Description
+| ---------------- | ------- | -----------
+| **baseline**     | 0       | The baseline provided.
+| **word_overlap** | 1       | Restructures the classificaiton problem from multi-class to multi-tier two-class, and modifies the word_overlap feature to filter common words.
+| **paraphrasing** | 2       | **TODO: WRITE DESCRIPTION**
+| **final**        | 3       | Adds Naive Bayes classifier and all caps frequency feature.
 
 Each source subfolder contains the following files and folders:
 
