@@ -84,6 +84,7 @@ def get_commonwords(l):
     return [k for k,v in sorted_counts[:int(0.005 * len(sorted_counts))]]
 
 # Paraphrase related code ++
+# Added by Prajwal
 
 def tag(sentence):
     words = word_tokenize(sentence)
@@ -135,6 +136,7 @@ def get_article_lemmas(headlines, bodies):
 def naive_bayes_train(fold_stances, dataset, repl):
     # Naive Bayes classifier, modified for k-folds estimation
     # Source: http://scikit-learn.org/stable/tutorial/text_analytics/working_with_text_data.html
+    # Added by Julian
     global cvec, tfidf, mnb
     best_score = 0
     ids = dict()
@@ -186,6 +188,8 @@ def naive_bayes_train(fold_stances, dataset, repl):
             mnb = _mnb
 
 def naive_bayes_features(headlines, bodies):
+    # Predicts on Naive Bayes classifier trained in naive_bayes_train()
+    # Added by Julian
     articles = []
     for i, (h, b) in tqdm(enumerate(zip(headlines, bodies))):
         articles.append(h + " " + b)
@@ -267,6 +271,8 @@ def polarity_features(headlines, bodies):
 
 
 def format_features(headlines, bodies):
+    # Generates features based on text formatting
+    # Added by Julian
     X = []
     total_caps = 0
     for headline, body in zip(headlines, bodies):

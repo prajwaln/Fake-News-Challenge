@@ -142,8 +142,8 @@ if __name__ == "__main__":
     d = DataSet(path=datapath)
     competition_dataset = DataSet("competition_test", path=datapath)
 
+    print('Classifying related/unrelated articles...')
     id = run_stage(generate_features_all, d, competition_dataset)
-    print_scores(d, competition_dataset, id)
 
     # Clear placeholder values
     for s in d.stances:
@@ -151,8 +151,8 @@ if __name__ == "__main__":
     for s in competition_dataset.stances:
         s['Predict'] = s['Predict'] if s['Predict'] == 'unrelated' else '?'
 
+    print('Classifying biased/discuss articles...')
     id = run_stage(generate_features_related, d, competition_dataset)
-    print_scores(d, competition_dataset, id)
 
     # Clear placeholder values
     for s in d.stances:
@@ -160,5 +160,7 @@ if __name__ == "__main__":
     for s in competition_dataset.stances:
         s['Predict'] = s['Predict'] if s['Predict'] in ['discuss','unrelated'] else '?'
 
+    print('Classifying agree/disagree articles...')
     id = run_stage(generate_features_biased, d, competition_dataset)
+
     print_scores(d, competition_dataset, id)

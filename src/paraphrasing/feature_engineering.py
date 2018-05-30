@@ -70,6 +70,7 @@ def get_commonwords(l):
     return [k for k,v in sorted_counts[:int(0.005 * len(sorted_counts))]]
 
 # Paraphrase related code ++
+# Added by Prajwal
 
 def tag(sentence):
     words = word_tokenize(sentence)
